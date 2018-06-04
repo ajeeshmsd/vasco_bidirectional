@@ -97,8 +97,7 @@ public class Context<M,N,A> implements soot.Context, Comparable<Context<M,N,A>> 
 	private Table<N, N, A> vals = HashBasedTable.create();
 
 	/** The work-list of nodes that still need to be analysed. */
-	private NavigableSet<N> forwardWorkList;
-	private NavigableSet<N> backwardWorkList;
+	private NavigableSet<N> workList;
 
 	private LinkedList<Pair<N, N>> workListOfEdges;
 	/**
@@ -113,8 +112,7 @@ public class Context<M,N,A> implements soot.Context, Comparable<Context<M,N,A>> 
 		this.inValues = new HashMap<N, A>();
 		this.outValues = new HashMap<N, A>();
 		this.analysed = false;
-		this.forwardWorkList = new TreeSet<N>();
-		this.backwardWorkList = new TreeSet<N>();
+		this.workList = new TreeSet<N>();
 		this.workListOfEdges = new LinkedList<Pair<N, N>>();
 	}
 
@@ -159,13 +157,7 @@ public class Context<M,N,A> implements soot.Context, Comparable<Context<M,N,A>> 
 		numbers.put(null, Integer.MAX_VALUE);
 		// Now, create a sorted set with a comparator created on-the-fly using
 		// the total order.
-		this.forwardWorkList = new TreeSet<N>(new Comparator<N>() {
-			@Override
-			public int compare(N u, N v) {
-				return numbers.get(u) - numbers.get(v);
-			}
-		});
-		this.backwardWorkList = new TreeSet<N>(new Comparator<N>() {
+		this.workList = new TreeSet<N>(new Comparator<N>() {
 			@Override
 			public int compare(N u, N v) {
 				return numbers.get(u) - numbers.get(v);
@@ -195,8 +187,7 @@ public class Context<M,N,A> implements soot.Context, Comparable<Context<M,N,A>> 
 		inValues = null;
 		outValues = null;
 		controlFlowGraph = null;
-		forwardWorkList = null;
-		backwardWorkList = null;
+		workList = null;
 		freeContexts.add(this);
 	}
 
@@ -280,16 +271,14 @@ public class Context<M,N,A> implements soot.Context, Comparable<Context<M,N,A>> 
 		return inValues.get(node);
 	}
 
-	public NavigableSet<N> getForwardWorkList() { return forwardWorkList; }
-
-	public NavigableSet<N> getBackwardWorkList() { return backwardWorkList; }
-
 	/**
 	 * Returns a reference to this context's work-list.
 	 * 
 	 * @return a reference to this context's work-list
 	 */
-
+	public NavigableSet<N> getWorkList() {
+		return workList;
+	}
 
 	public LinkedList<Pair<N, N>> getWorkListOfEdges() {
 		return this.workListOfEdges;
