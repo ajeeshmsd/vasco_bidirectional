@@ -48,7 +48,7 @@ import java.util.Stack;
  * It is only here for a temporary period while the {@link vasco.callgraph.PointsToAnalysis PointsToAnalysis} class is migrated to the new API.
  * After that work is done, this class will be permanently removed from VASCO. 
  */
-public abstract class OldForwardInterProceduralAnalysis<M,N,A> extends InterProceduralAnalysis<M,N,A> {
+public abstract class OldForwardInterProceduralAnalysis<M,N,A> extends InterProceduralAnalysis<M,N,A,Void,A> {
 
 	/** Constructs a new forward-flow inter-procedural analysis. */
 	public OldForwardInterProceduralAnalysis() {
@@ -79,9 +79,9 @@ public abstract class OldForwardInterProceduralAnalysis<M,N,A> extends InterProc
 			Context<M,N,A> context = analysisStack.peek();
 
 			// Either analyse the next pending unit or pop out of the method
-			if (!context.getWorkList().isEmpty()) {
+			if (!context.getForwardWorkList().isEmpty()) {
 				// work-list contains items; So the next unit to analyse.
-				N unit = context.getWorkList().pollFirst();
+				N unit = context.getForwardWorkList().pollFirst();
 
 				if (unit != null) {
 					// Compute the IN data flow value (only for non-entry units).
@@ -121,17 +121,17 @@ public abstract class OldForwardInterProceduralAnalysis<M,N,A> extends InterProc
 					if (out.equals(prevOut) == false) {
 						// Then add successors to the work-list.
 						for (N successor : context.getControlFlowGraph().getSuccsOf(unit)) {
-							context.getWorkList().add(successor);
+							context.getForwardWorkList().add(successor);
 						}
 						// If the unit is in TAILS, then we have at least one
 						// path to the end of the method, so add the NULL unit
 						if (context.getControlFlowGraph().getTails().contains(unit)) {
-							context.getWorkList().add(null);
+							context.getForwardWorkList().add(null);
 						}
 					}
 				} else {
 					// NULL unit, which means the end of the method.
-					assert (context.getWorkList().isEmpty());
+					assert (context.getForwardWorkList().isEmpty());
 
 					// Exit flow value is the merge of the OUTs of the tail nodes.
 					A exitFlow = topValue();
@@ -157,7 +157,7 @@ public abstract class OldForwardInterProceduralAnalysis<M,N,A> extends InterProc
 							Context<M,N,A> callingContext = callSite.getCallingContext();
 							N callingNode = callSite.getCallNode();
 							// Add the calling unit to the calling context's work-list.
-							callingContext.getWorkList().add(callingNode);
+							callingContext.getForwardWorkList().add(callingNode);
 							// Ensure that the calling context is on the analysis stack,
 							// and if not, push it on to the stack.
 							if (!analysisStack.contains(callingContext)) {
@@ -234,7 +234,7 @@ public abstract class OldForwardInterProceduralAnalysis<M,N,A> extends InterProc
 		for (N unit : context.getControlFlowGraph().getHeads()) {
 			context.setValueBefore(unit, copy(entryValue));
 			// Add entry points to work-list
-			context.getWorkList().add(unit);
+			context.getForwardWorkList().add(unit);
 		}
 
 		// Add this new context to the given method's mapping.

@@ -40,13 +40,16 @@ import java.util.TreeSet;
  * 
  * @param <M> the type of a method
  * @param <N> the type of a node in the CFG
- * @param <A> the type of a data flow value
+ * @param <F> the type of a forward data flow value
+ * @param <B> the type of a backward data flow value
+ * @param <A> the type of a data flow value that defines the context.
+ *           Same as F for forward analysis, same as B for backward analysis, Pair<F,B> for bidirectional
  * 
  * @see Context
  * @see ContextTransitionTable
  * @see CallSite
  */
-public abstract class InterProceduralAnalysis<M,N,A> {
+public abstract class InterProceduralAnalysis<M,N,F,B,A> {
 	
 	/** A work-list of contexts to process. */
 	protected final NavigableSet<Context<M,N,A>> worklist;
@@ -65,7 +68,7 @@ public abstract class InterProceduralAnalysis<M,N,A> {
 	 * <tt>true</tt> if the direction of analysis is backward, or <tt>false</tt>
 	 * if it is forward.
 	 */
-	protected final boolean reverse;
+//	protected final boolean reverse;
 
 	/**
 	 * A flag, if set, directs the analysis to free memory storing
@@ -106,7 +109,7 @@ public abstract class InterProceduralAnalysis<M,N,A> {
 	public InterProceduralAnalysis(boolean reverse) {
 
 		// Set direction
-		this.reverse = reverse;
+//		this.reverse = reverse;
 
 		// Initialise map of methods to contexts.
 		contexts = new HashMap<M,List<Context<M,N,A>>>();
@@ -133,15 +136,18 @@ public abstract class InterProceduralAnalysis<M,N,A> {
 	 * 
 	 * @see ProgramRepresentation#getEntryPoints()
 	 */
-	public abstract A boundaryValue(M entryPoint);
-
+//	public abstract A boundaryValue(M entryPoint);
+	public abstract F forwardBoundaryValue(M entryPoint);
+	public abstract B backwardBoundaryValue(M entryPoint);
 	/**
 	 * Returns a copy of the given data flow value.
 	 * 
 	 * @param src the data flow value to copy
 	 * @return a new data flow value which is a copy of the argument
 	 */
-	public abstract A copy(A src);
+	public abstract F copyForwardValue(F src);
+	public abstract B copyBackwardValue(B src);
+//	public abstract A copy(A src);
 
 	/**
 	 * Performs the actual data flow analysis.
@@ -179,35 +185,12 @@ public abstract class InterProceduralAnalysis<M,N,A> {
 	 * Retrieves a particular value context if it has been constructed.
 	 * 
 	 * @param method the method whose value context to find
-	 * @param value the data flow value at the entry (forward flow) or exit
-	 *            (backward flow) of the method
+	 * @param forwardValue the data flow value at the entry (forward flow)
+     * @param backwardValue the data flow value at the exit (backward flow)
 	 * @return the value context, if one is found with the given parameters,
 	 *         or <tt>null</tt> otherwise
 	 */
-	public Context<M,N,A> getContext(M method, A value) {
-		// If this method does not have any contexts, then we'll have to return nothing.
-		if (!contexts.containsKey(method)) {
-			return null;
-		}
-		// Otherwise, look for a context in this method's list with the given value.
-		if (reverse) {
-			// Backward flow, so check for EXIT FLOWS
-			for (Context<M,N,A> context : contexts.get(method)) {
-				if (value.equals(context.getExitValue())) {
-					return context;
-				}
-			}
-		} else {
-			// Forward flow, so check for ENTRY FLOWS
-			for (Context<M,N,A> context : contexts.get(method)) {
-				if (value.equals(context.getEntryValue())) {
-					return context;
-				}
-			}
-		}
-		// If nothing found return null.
-		return null;
-	}
+	public abstract Context<M,N,A> getContext(M method, F forwardValue, B backwardValue);
 
 	/**
 	 * Returns a list of value contexts constructed for a given method.
@@ -288,6 +271,8 @@ public abstract class InterProceduralAnalysis<M,N,A> {
 	 *         two operands
 	 */
 	public abstract A meet(A op1, A op2);
+	public abstract F forwardMeet(F op1, F op2);
+	public abstract B backwardMeeet(B op1, B op2);
 
 	/**
 	 * Returns a program representation on top of which the inter-procedural
@@ -305,5 +290,7 @@ public abstract class InterProceduralAnalysis<M,N,A> {
 	 * @return the default data flow value (lattice top)
 	 */
 	public abstract A topValue();
+    public abstract F forwardTopValue();
+    public abstract B backwardTopValue();
 
 }

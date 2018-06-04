@@ -42,7 +42,7 @@ import java.util.Set;
  * @param <N> the type of a node in the CFG
  * @param <A> the type of a data flow value
  */
-public abstract class BackwardInterProceduralAnalysis<M,N,A> extends InterProceduralAnalysis<M,N,A> {
+public abstract class BackwardInterProceduralAnalysis<M,N,A> extends InterProceduralAnalysis<M,N,Void,A,A> {
 
 	/** Constructs a new backward-flow inter-procedural analysis. */
 	public BackwardInterProceduralAnalysis() {
@@ -68,14 +68,14 @@ public abstract class BackwardInterProceduralAnalysis<M,N,A> extends InterProced
 			Context<M,N,A> currentContext = worklist.last();
 			
 			// If this context has no more nodes to analyze, then take it out of the work-list
-			if (currentContext.getWorkList().isEmpty()) {
+			if (currentContext.getBackwardWorkList().isEmpty()) {
 				worklist.remove(currentContext);
 				continue;
 			}
 
 
 			// Remove the next node to process from the context's work-list
-			N node = currentContext.getWorkList().pollFirst();
+			N node = currentContext.getBackwardWorkList().pollFirst();
 
 			if (node != null) {
 				// Compute the OUT data flow value (only for non-exit units).
@@ -168,17 +168,17 @@ public abstract class BackwardInterProceduralAnalysis<M,N,A> extends InterProced
 				if (in.equals(prevIn) == false) {
 					// Then add predecessors to the work-list.
 					for (N predecessors : currentContext.getControlFlowGraph().getPredsOf(node)) {
-						currentContext.getWorkList().add(predecessors);
+						currentContext.getBackwardWorkList().add(predecessors);
 					}
 				}
 				// If the unit is in HEADS, then we have at least one
 				// path to the start of the method, so add the NULL unit
 				if (currentContext.getControlFlowGraph().getHeads().contains(node)) {
-					currentContext.getWorkList().add(null);
+					currentContext.getBackwardWorkList().add(null);
 				}
 			} else {
 				// NULL unit, which means the end of the method.
-				assert (currentContext.getWorkList().isEmpty());
+				assert (currentContext.getBackwardWorkList().isEmpty());
 
 				// Entry value is the merge of the INs of the head nodes.
 				A entryValue = topValue();
@@ -201,7 +201,7 @@ public abstract class BackwardInterProceduralAnalysis<M,N,A> extends InterProced
 						Context<M,N,A> callingContext = callSite.getCallingContext();
 						N callNode = callSite.getCallNode();
 						// Add the calling unit to the calling context's node work-list.
-						callingContext.getWorkList().add(callNode);
+						callingContext.getBackwardWorkList().add(callNode);
 						// Ensure that the calling context is on the context work-list.
 						worklist.add(callingContext);
 					}
@@ -266,7 +266,7 @@ public abstract class BackwardInterProceduralAnalysis<M,N,A> extends InterProced
 		for (N unit : context.getControlFlowGraph()) {
 			context.setValueBefore(unit, topValue());
 			context.setValueAfter(unit, topValue());
-			context.getWorkList().add(unit);
+			context.getBackwardWorkList().add(unit);
 		}
 
 		// Now, initialise the OUT of exit points with a copy of the given exit value.
