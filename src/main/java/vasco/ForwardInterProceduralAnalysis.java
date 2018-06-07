@@ -47,7 +47,7 @@ public abstract class ForwardInterProceduralAnalysis<M,N,A> extends InterProcedu
 	/** Constructs a new forward-flow inter-procedural analysis. */
 	public ForwardInterProceduralAnalysis() {
 		// Kick-up to the super with the FORWARD direction.
-		super(false);
+		super(Direction.FORWARD);
 
 	}
 
@@ -63,20 +63,20 @@ public abstract class ForwardInterProceduralAnalysis<M,N,A> extends InterProcedu
 		}
 
 		// Perform work-list based analysis
-		while (!worklist.isEmpty()) {
+		while (!forwardWorkList.isEmpty()) {
 			// Get the newest context on the work-list
-			Context<M,N,A> currentContext = worklist.last();
+			Context<M,N,A> currentContext = forwardWorkList.last();
 			
 			// If this context has no more nodes to analyze, then take it out of the work-list
-			if (currentContext.getWorkList().isEmpty()) {
+			if (currentContext.getForwardWorkList().isEmpty()) {
 				currentContext.markAnalysed();
-				worklist.remove(currentContext);
+				forwardWorkList.remove(currentContext);
 				continue;
 			}
 
 
 			// Remove the next node to process from the context's work-list
-			N node = currentContext.getWorkList().pollFirst();
+			N node = currentContext.getForwardWorkList().pollFirst();
 
 			if (node != null) {
 				// Compute the IN data flow value (only for non-entry units).
@@ -179,17 +179,17 @@ public abstract class ForwardInterProceduralAnalysis<M,N,A> extends InterProcedu
 				if (out.equals(prevOut) == false) {
 					// Then add successors to the work-list.
 					for (N successor : currentContext.getControlFlowGraph().getSuccsOf(node)) {
-						currentContext.getWorkList().add(successor);
+						currentContext.getForwardWorkList().add(successor);
 					}
 				}
 				// If the unit is in TAILS, then we have at least one
 				// path to the end of the method, so add the NULL unit
 				if (currentContext.getControlFlowGraph().getTails().contains(node)) {
-					currentContext.getWorkList().add(null);
+					currentContext.getForwardWorkList().add(null);
 				}
 			} else {
 				// NULL unit, which means the end of the method.
-				assert (currentContext.getWorkList().isEmpty());
+				assert (currentContext.getForwardWorkList().isEmpty());
 
 				// Exit value is the merge of the OUTs of the tail nodes.
 				A exitValue = topValue();
@@ -212,9 +212,9 @@ public abstract class ForwardInterProceduralAnalysis<M,N,A> extends InterProcedu
 						Context<M,N,A> callingContext = callSite.getCallingContext();
 						N callNode = callSite.getCallNode();
 						// Add the calling unit to the calling context's node work-list.
-						callingContext.getWorkList().add(callNode);
+						callingContext.getForwardWorkList().add(callNode);
 						// Ensure that the calling context is on the context work-list.
-						worklist.add(callingContext);
+						forwardWorkList.add(callingContext);
 					}
 				}
 				
@@ -224,7 +224,7 @@ public abstract class ForwardInterProceduralAnalysis<M,N,A> extends InterProcedu
 					// If any reachable contexts exist on the work-list, then we cannot free memory
 					boolean canFree = true;
 					for (Context<M,N,A> reachableContext : reachableContexts) {
-						if (worklist.contains(reachableContext)) {
+						if (forwardWorkList.contains(reachableContext)) {
 							canFree = false;
 							break;
 						}
@@ -292,7 +292,7 @@ public abstract class ForwardInterProceduralAnalysis<M,N,A> extends InterProcedu
 		for (N unit : context.getControlFlowGraph()) {
 			context.setValueBefore(unit, topValue());
 			context.setValueAfter(unit, topValue());
-			context.getWorkList().add(unit);
+			context.getForwardWorkList().add(unit);
 		}
 
 		// Now, initialise the IN of entry points with a copy of the given entry value.
@@ -309,7 +309,7 @@ public abstract class ForwardInterProceduralAnalysis<M,N,A> extends InterProcedu
 		contexts.get(method).add(context);
 		
 		// Add this context to the global work-list
-		worklist.add(context);
+		forwardWorkList.add(context);
 		
 		return context;
 

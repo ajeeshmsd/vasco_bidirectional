@@ -49,7 +49,8 @@ import java.util.TreeSet;
 public abstract class InterProceduralAnalysis<M,N,A> {
 	
 	/** A work-list of contexts to process. */
-	protected final NavigableSet<Context<M,N,A>> worklist;
+	protected final NavigableSet<Context<M,N,A>> forwardWorkList;
+	protected final NavigableSet<Context<M,N,A>> backwardWorkList;
 
 	/** A mapping from methods to a list of contexts for quick lookups. */
 	protected final Map<M,List<Context<M,N,A>>> contexts;
@@ -60,12 +61,15 @@ public abstract class InterProceduralAnalysis<M,N,A> {
 	 */
 	protected final ContextTransitionTable<M,N,A> contextTransitions;
 
+	protected enum Direction {
+	    FORWARD, BACKWARD, BI_DIRECTION
+    }
 
 	/**
 	 * <tt>true</tt> if the direction of analysis is backward, or <tt>false</tt>
 	 * if it is forward.
 	 */
-	protected final boolean reverse;
+	protected final Direction direction;
 
 	/**
 	 * A flag, if set, directs the analysis to free memory storing
@@ -100,13 +104,14 @@ public abstract class InterProceduralAnalysis<M,N,A> {
 	/**
 	 * Constructs a new inter-procedural analysis.
 	 * 
-	 * @param reverse <tt>true</tt> if the analysis is in the reverse direction,
-	 *            <tt>false</tt> if it is in the forward direction
+	 * @param direction <tt>FORWARD</tt> if the analysis is in forward direction,
+	 *                  <tt>BACKWARD</tt> if it is in the backward direction,
+     *                  <tt>BI_DIRECTIONAL</tt> if it is bidirectional analysis.
 	 */
-	public InterProceduralAnalysis(boolean reverse) {
+	public InterProceduralAnalysis(Direction direction) {
 
 		// Set direction
-		this.reverse = reverse;
+		this.direction = direction;
 
 		// Initialise map of methods to contexts.
 		contexts = new HashMap<M,List<Context<M,N,A>>>();
@@ -115,8 +120,8 @@ public abstract class InterProceduralAnalysis<M,N,A> {
 		contextTransitions = new ContextTransitionTable<M,N,A>();
 		
 		// Initialise the work-list
-		worklist = new TreeSet<Context<M,N,A>>();
-
+		forwardWorkList = new TreeSet<Context<M,N,A>>();
+		backwardWorkList = new TreeSet<Context<M,N,A>>();
 	}
 
 	/**
@@ -190,21 +195,29 @@ public abstract class InterProceduralAnalysis<M,N,A> {
 			return null;
 		}
 		// Otherwise, look for a context in this method's list with the given value.
-		if (reverse) {
-			// Backward flow, so check for EXIT FLOWS
-			for (Context<M,N,A> context : contexts.get(method)) {
-				if (value.equals(context.getExitValue())) {
-					return context;
-				}
-			}
-		} else {
-			// Forward flow, so check for ENTRY FLOWS
-			for (Context<M,N,A> context : contexts.get(method)) {
-				if (value.equals(context.getEntryValue())) {
-					return context;
-				}
-			}
-		}
+        switch (direction){
+            case FORWARD:
+                // Forward flow, so check for ENTRY FLOWS
+                for (Context<M,N,A> context : contexts.get(method)) {
+                    if (value.equals(context.getEntryValue())) {
+                        return context;
+                    }
+                }
+                break;
+
+            case BACKWARD:
+                // Backward flow, so check for EXIT FLOWS
+                for (Context<M,N,A> context : contexts.get(method)) {
+                    if (value.equals(context.getExitValue())) {
+                        return context;
+                    }
+                }
+                break;
+            case BI_DIRECTION:
+                //Cannot check here. This function has to be overridden in Bidirectional class
+                return null;
+        }
+
 		// If nothing found return null.
 		return null;
 	}

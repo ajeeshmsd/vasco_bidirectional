@@ -1,19 +1,19 @@
 /**
  * Copyright (C) 2013 Rohan Padhye
- * 
+ *
  * This library is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as 
  * published by the Free Software Foundation, either version 2.1 of the 
  * License, or (at your option) any later version.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 package vasco;
 
@@ -35,7 +35,7 @@ import soot.toolkits.scalar.Pair;
 /**
  * A value-based context for a context-sensitive inter-procedural data flow
  * analysis.
- * 
+ *
  * <p>
  * A value-based context is identified as a pair of a method and the data
  * flow value at the entry of the method, for forward flows, or the data
@@ -46,314 +46,327 @@ import soot.toolkits.scalar.Pair;
  * recursion as the number of contexts is limited by the size of the lattice
  * (which must be finite).
  * </p>
- * 
+ *
  * <p>
  * Each value context has its own work-list of CFG nodes to analyse, and the
  * results of analysis are stored in a map from nodes to the data flow values
  * before/after the node.
  * </p>
- * 
+ *
  * @author Rohan Padhye
- * 
+ *
  * @param <M> the type of a method
  * @param <N> the type of a node in the CFG
  * @param <A> the type of a data flow value
  */
 public class Context<M,N,A> implements soot.Context, Comparable<Context<M,N,A>> {
 
-	/** A counter for global context identifiers. */
-	private static int count = 0;
+    /** A counter for global context identifiers. */
+    private static int count = 0;
 
-	/** Debug stuff */
-	static java.util.Set<Object> freeContexts = new java.util.HashSet<Object>();
-	static int totalNodes = 0;
-	static int liveNodes = 0;
+    /** Debug stuff */
+    static java.util.Set<Object> freeContexts = new java.util.HashSet<Object>();
+    static int totalNodes = 0;
+    static int liveNodes = 0;
 
-	/** Whether or not this context has been fully analysed at least once. */
-	private boolean analysed;
+    /** Whether or not this context has been fully analysed at least once. */
+    private boolean analysed;
 
-	/** The control-flow graph of this method's body. */
-	private DirectedGraph<N> controlFlowGraph;
+    /** The control-flow graph of this method's body. */
+    private DirectedGraph<N> controlFlowGraph;
 
-	/** The data flow value associated with the entry to the method. **/
-	private A entryValue;
+    /** The data flow value associated with the entry to the method. **/
+    private A entryValue;
 
-	/** The data flow value associated with the exit of the method. */
-	private A exitValue;
+    /** The data flow value associated with the exit of the method. */
+    private A exitValue;
 
-	/** A globally unique identifier. */
-	private int id;
+    /** A globally unique identifier. */
+    private int id;
 
-	
-	/** The method for which this calling context context applies. */
-	private M method;
 
-	/** The data flow values at the exit of each node. */
-	private Map<N,A> outValues;
+    /** The method for which this calling context context applies. */
+    private M method;
 
-	/** The data flow values at the entry of each node. */
-	private Map<N,A> inValues;
+    /** The data flow values at the exit of each node. */
+    private Map<N,A> outValues;
 
-	private Table<N, N, A> vals = HashBasedTable.create();
+    /** The data flow values at the entry of each node. */
+    private Map<N,A> inValues;
 
-	/** The work-list of nodes that still need to be analysed. */
-	private NavigableSet<N> workList;
+    private Table<N, N, A> vals = HashBasedTable.create();
 
-	private LinkedList<Pair<N, N>> workListOfEdges;
-	/**
-	 * Creates a new context for phantom method
-	 * 
-	 * @param method
-	 */
-	public Context(M method) {
-		count++;
-		this.id = count;
-		this.method = method;
-		this.inValues = new HashMap<N, A>();
-		this.outValues = new HashMap<N, A>();
-		this.analysed = false;
-		this.workList = new TreeSet<N>();
-		this.workListOfEdges = new LinkedList<Pair<N, N>>();
-	}
+    /** The work-list of nodes that still need to be analysed. */
+    private NavigableSet<N> forwardWorkList;
+    private NavigableSet<N> backwardWorkList;
 
-	/**
-	 * Creates a new context for the given method.
-	 * 
-	 * @param method
-	 *            the method to which this value context belongs
-	 * @param cfg
-	 *            the control-flow graph for the body of <tt>method</tt>
-	 * @param reverse
-	 *            <tt>true</tt> if the analysis is in the reverse direction, and
-	 *            <tt>false</tt> if the analysis is in the forward direction
-	 */
-	public Context(M method, DirectedGraph<N> cfg, boolean reverse) {
-		// Increment count and set id.
-		count++;
-		this.id = count;
+    private LinkedList<Pair<N, N>> workListOfEdges;
+    /**
+     * Creates a new context for phantom method
+     *
+     * @param method
+     */
+    public Context(M method) {
+        count++;
+        this.id = count;
+        this.method = method;
+        this.inValues = new HashMap<N, A>();
+        this.outValues = new HashMap<N, A>();
+        this.analysed = false;
+        this.forwardWorkList = new TreeSet<N>();
+        this.backwardWorkList = new TreeSet<N>();
+        this.workListOfEdges = new LinkedList<Pair<N, N>>();
+    }
 
-		// Initialise fields.
-		this.method = method;
-		this.controlFlowGraph = cfg;
-		this.inValues = new HashMap<N,A>();
-		this.outValues = new HashMap<N,A>();
-		this.analysed = false;
-		
-		totalNodes = totalNodes + controlFlowGraph.size();
-		liveNodes = liveNodes + controlFlowGraph.size();
+    /**
+     * Creates a new context for the given method.
+     *
+     * @param method
+     *            the method to which this value context belongs
+     * @param cfg
+     *            the control-flow graph for the body of <tt>method</tt>
+     * @param reverse
+     *            <tt>true</tt> if the analysis is in the reverse direction, and
+     *            <tt>false</tt> if the analysis is in the forward direction
+     */
+    public Context(M method, DirectedGraph<N> cfg, boolean reverse) {
+        // Increment count and set id.
+        count++;
+        this.id = count;
 
-		// Now to initialise work-list. First, let's create a total order.
-		@SuppressWarnings("unchecked")
-		List<N> orderedNodes = new SlowPseudoTopologicalOrderer().newList(controlFlowGraph, reverse);
-		// Then a mapping from a N to the position in the order.
-		final Map<N,Integer> numbers = new HashMap<N,Integer>();
-		int num = 1;
-		for (N N : orderedNodes) {
-			numbers.put(N, num);
-			num++;
-		}
-		// Map the lowest priority to the null N, which is used to aggregate
-		// ENTRY/EXIT flows.
-		numbers.put(null, Integer.MAX_VALUE);
-		// Now, create a sorted set with a comparator created on-the-fly using
-		// the total order.
-		this.workList = new TreeSet<N>(new Comparator<N>() {
-			@Override
-			public int compare(N u, N v) {
-				return numbers.get(u) - numbers.get(v);
-			}
-		});
-		this.workListOfEdges = new LinkedList<Pair<N, N>>();
-	}
+        // Initialise fields.
+        this.method = method;
+        this.controlFlowGraph = cfg;
+        this.inValues = new HashMap<N,A>();
+        this.outValues = new HashMap<N,A>();
+        this.analysed = false;
 
-	/**
-	 * Compares two contexts by their globally unique IDs.
-	 * 
-	 * This functionality is useful in the framework's internal methods
-	 * where ordered processing of newer contexts first helps speed up
-	 * certain operations.
-	 */
-	@Override
-	public int compareTo(Context<M,N,A> other) {
-		return this.getId() - other.getId();
-	}
+        totalNodes = totalNodes + controlFlowGraph.size();
+        liveNodes = liveNodes + controlFlowGraph.size();
 
-	/**
-	 * Destroys all data flow information associated with the nodes
-	 * of this context.
-	 */
-	public void freeMemory() {
-		liveNodes = liveNodes - controlFlowGraph.size();
-		inValues = null;
-		outValues = null;
-		controlFlowGraph = null;
-		workList = null;
-		freeContexts.add(this);
-	}
+        // Now to initialise work-list. First, let's create a total order.
+        @SuppressWarnings("unchecked")
+        List<N> orderedNodes = new SlowPseudoTopologicalOrderer().newList(controlFlowGraph, reverse);
+        // Then a mapping from a N to the position in the order.
+        final Map<N,Integer> numbers = new HashMap<N,Integer>();
+        int num = 1;
+        for (N N : orderedNodes) {
+            numbers.put(N, num);
+            num++;
+        }
+        // Map the lowest priority to the null N, which is used to aggregate
+        // ENTRY/EXIT flows.
+        numbers.put(null, Integer.MAX_VALUE);
+        // Now, create a sorted set with a comparator created on-the-fly using
+        // the total order.
+        this.forwardWorkList = new TreeSet<N>(new Comparator<N>() {
+            @Override
+            public int compare(N u, N v) {
+                return numbers.get(u) - numbers.get(v);
+            }
+        });
+        this.backwardWorkList = new TreeSet<N>(new Comparator<N>() {
+            @Override
+            public int compare(N u, N v) {
+                return numbers.get(u) - numbers.get(v);
+            }
+        });
+        this.workListOfEdges = new LinkedList<Pair<N, N>>();
+    }
 
-	/** 
-	 * Returns a reference to the control flow graph of this context's method. 
-	 * 
-	 * @return a reference to the control flow graph of this context's method
-	 */
-	public DirectedGraph<N> getControlFlowGraph() {
-		return controlFlowGraph;
-	}
-	
-	/** Returns the total number of contexts created so far. */
-	public static int getCount() {
-		return count;
-	}
+    /**
+     * Compares two contexts by their globally unique IDs.
+     *
+     * This functionality is useful in the framework's internal methods
+     * where ordered processing of newer contexts first helps speed up
+     * certain operations.
+     */
+    @Override
+    public int compareTo(Context<M,N,A> other) {
+        return this.getId() - other.getId();
+    }
 
-	/**
-	 * Returns a reference to the data flow value at the method entry.
-	 * 
-	 * @return a reference to the data flow value at the method entry
-	 */
-	public A getEntryValue() {
-		return entryValue;
-	}
+    /**
+     * Destroys all data flow information associated with the nodes
+     * of this context.
+     */
+    public void freeMemory() {
+        liveNodes = liveNodes - controlFlowGraph.size();
+        inValues = null;
+        outValues = null;
+        controlFlowGraph = null;
+        forwardWorkList = null;
+        backwardWorkList = null;
+        freeContexts.add(this);
+    }
 
-	/**
-	 * Returns a reference to the data flow value at the method exit.
-	 * 
-	 * @return a reference to the data flow value at the method exit
-	 */
-	public A getExitValue() {
-		return exitValue;
-	}
+    /**
+     * Returns a reference to the control flow graph of this context's method.
+     *
+     * @return a reference to the control flow graph of this context's method
+     */
+    public DirectedGraph<N> getControlFlowGraph() {
+        return controlFlowGraph;
+    }
 
-	/**
-	 * Returns the globally unique identifier of this context.
-	 * 
-	 * @return the globally unique identifier of this context
-	 */
-	public int getId() {
-		return id;
-	}
+    /** Returns the total number of contexts created so far. */
+    public static int getCount() {
+        return count;
+    }
 
-	/**
-	 * Returns a reference to this context's method.
-	 * 
-	 * @return a reference to this context's method
-	 */
-	public M getMethod() {
-		return method;
-	}
-	
-	public A getEdgeValue(N node, N succ) {
-		return this.vals.get(node, succ);
-	}
+    /**
+     * Returns a reference to the data flow value at the method entry.
+     *
+     * @return a reference to the data flow value at the method entry
+     */
+    public A getEntryValue() {
+        return entryValue;
+    }
 
-	public void setEdgeValue(N node, N succ, A val) {
-		if (this.vals == null) {
-			this.vals=HashBasedTable.create();
-		}
-		this.vals.put(node, succ, val);
-	}
-	/**
-	 * Gets the data flow value at the exit of the given node.
-	 * 
-	 * @param node a node in the control flow graph
-	 * @return the data flow value at the exit of the given node
-	 */
-	public A getValueAfter(N node) {
-		return outValues.get(node);
-	}
+    /**
+     * Returns a reference to the data flow value at the method exit.
+     *
+     * @return a reference to the data flow value at the method exit
+     */
+    public A getExitValue() {
+        return exitValue;
+    }
 
-	/**
-	 * Gets the data flow value at the entry of the given node.
-	 * 
-	 * @param node a node in the control flow graph
-	 * @return the data flow value at the entry of the given node
-	 */
-	public A getValueBefore(N node) {
-		return inValues.get(node);
-	}
+    /**
+     * Returns the globally unique identifier of this context.
+     *
+     * @return the globally unique identifier of this context
+     */
+    public int getId() {
+        return id;
+    }
 
-	/**
-	 * Returns a reference to this context's work-list.
-	 * 
-	 * @return a reference to this context's work-list
-	 */
-	public NavigableSet<N> getWorkList() {
-		return workList;
-	}
+    /**
+     * Returns a reference to this context's method.
+     *
+     * @return a reference to this context's method
+     */
+    public M getMethod() {
+        return method;
+    }
 
-	public LinkedList<Pair<N, N>> getWorkListOfEdges() {
-		return this.workListOfEdges;
-	}
+    public A getEdgeValue(N node, N succ) {
+        return this.vals.get(node, succ);
+    }
 
-	/** 
-	 * Returns whether or not this context has been analysed at least once. 
-	 *
-	 * @return <tt>true</tt> if the context has been analysed at least once,
-	 * or <tt>false</tt> otherwise
-	 */
-	public boolean isAnalysed() {
-		return analysed;
-	}
+    public void setEdgeValue(N node, N succ, A val) {
+        if (this.vals == null) {
+            this.vals=HashBasedTable.create();
+        }
+        this.vals.put(node, succ, val);
+    }
+    /**
+     * Gets the data flow value at the exit of the given node.
+     *
+     * @param node a node in the control flow graph
+     * @return the data flow value at the exit of the given node
+     */
+    public A getValueAfter(N node) {
+        return outValues.get(node);
+    }
 
-	/**
-	 * Returns whether the information about individual CFG nodes has
-	 * been released.
-	 * 
-	 * @return <tt>true</tt> if the context data has been released
-	 */
-	boolean isFreed() {
-		return inValues == null && outValues == null;
-	}
+    /**
+     * Gets the data flow value at the entry of the given node.
+     *
+     * @param node a node in the control flow graph
+     * @return the data flow value at the entry of the given node
+     */
+    public A getValueBefore(N node) {
+        return inValues.get(node);
+    }
 
-	/** 
-	 * Marks this context as analysed.
-	 */
-	public void markAnalysed() {
-		this.analysed = true;
-	}
+    /**
+     * Returns a reference to this context's work-list.
+     *
+     * @return a reference to this context's work-list
+     */
+    public NavigableSet<N> getForwardWorkList() {
+        return forwardWorkList;
+    }
 
-	/** 
-	 * Sets the entry flow of this context. 
-	 * 
-	 * @param entryValue the new data flow value at the method entry
-	 */
-	public void setEntryValue(A entryValue) {
-		this.entryValue = entryValue;
-	}
+    public NavigableSet<N> getBackwardWorkList() {
+        return backwardWorkList;
+    }
 
-	/** 
-	 * Sets the exit flow of this context. 
-	 * 
-	 * @param exitValue the new data flow value at the method exit
-	 */
-	public void setExitValue(A exitValue) {
-		this.exitValue = exitValue;
-	}
-	/** 
-	 * Sets the data flow value at the exit of the given node.
-	 * 
-	 * @param node a node in the control flow graph
-	 * @param value the new data flow at the node exit
-	 */
-	public void setValueAfter(N node, A value) {
-		outValues.put(node, value);
-	}
-	/** 
-	 * Sets the data flow value at the entry of the given node.
-	 * 
-	 * @param node a node in the control flow graph
-	 * @param value the new data flow at the node entry
-	 */
-	public void setValueBefore(N node, A value) {
-		inValues.put(node, value);
-	}
-	
-	/** {@inheritDoc} */
-	@Override
-	public String toString() {
-		return Integer.toString(id);
-	}
+    public LinkedList<Pair<N, N>> getWorkListOfEdges() {
+        return this.workListOfEdges;
+    }
 
-	public void unmarkAnalysed() {
-		this.analysed = false;
-	}
+    /**
+     * Returns whether or not this context has been analysed at least once.
+     *
+     * @return <tt>true</tt> if the context has been analysed at least once,
+     * or <tt>false</tt> otherwise
+     */
+    public boolean isAnalysed() {
+        return analysed;
+    }
+
+    /**
+     * Returns whether the information about individual CFG nodes has
+     * been released.
+     *
+     * @return <tt>true</tt> if the context data has been released
+     */
+    boolean isFreed() {
+        return inValues == null && outValues == null;
+    }
+
+    /**
+     * Marks this context as analysed.
+     */
+    public void markAnalysed() {
+        this.analysed = true;
+    }
+
+    /**
+     * Sets the entry flow of this context.
+     *
+     * @param entryValue the new data flow value at the method entry
+     */
+    public void setEntryValue(A entryValue) {
+        this.entryValue = entryValue;
+    }
+
+    /**
+     * Sets the exit flow of this context.
+     *
+     * @param exitValue the new data flow value at the method exit
+     */
+    public void setExitValue(A exitValue) {
+        this.exitValue = exitValue;
+    }
+    /**
+     * Sets the data flow value at the exit of the given node.
+     *
+     * @param node a node in the control flow graph
+     * @param value the new data flow at the node exit
+     */
+    public void setValueAfter(N node, A value) {
+        outValues.put(node, value);
+    }
+    /**
+     * Sets the data flow value at the entry of the given node.
+     *
+     * @param node a node in the control flow graph
+     * @param value the new data flow at the node entry
+     */
+    public void setValueBefore(N node, A value) {
+        inValues.put(node, value);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+        return Integer.toString(id);
+    }
+
+    public void unmarkAnalysed() {
+        this.analysed = false;
+    }
 }
