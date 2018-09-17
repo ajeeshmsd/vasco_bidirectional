@@ -49,8 +49,7 @@ import java.util.TreeSet;
 public abstract class InterProceduralAnalysis<M,N,A> {
 	
 	/** A work-list of contexts to process. */
-	protected final NavigableSet<Context<M,N,A>> forwardWorkList;
-	protected final NavigableSet<Context<M,N,A>> backwardWorkList;
+	protected final NavigableSet<Context<M,N,A>> workList;
 
 	/** A mapping from methods to a list of contexts for quick lookups. */
 	protected final Map<M,List<Context<M,N,A>>> contexts;
@@ -120,8 +119,7 @@ public abstract class InterProceduralAnalysis<M,N,A> {
 		contextTransitions = new ContextTransitionTable<M,N,A>();
 		
 		// Initialise the work-list
-		forwardWorkList = new TreeSet<Context<M,N,A>>();
-		backwardWorkList = new TreeSet<Context<M,N,A>>();
+		workList = new TreeSet<Context<M,N,A>>();
 	}
 
 	/**

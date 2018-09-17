@@ -63,13 +63,13 @@ public abstract class BackwardInterProceduralAnalysis<M,N,A> extends InterProced
 		}
 
 		// Perform work-list based analysis
-		while (!backwardWorkList.isEmpty()) {
+		while (!workList.isEmpty()) {
 			// Get the newest context on the work-list
-			Context<M,N,A> currentContext = backwardWorkList.last();
+			Context<M,N,A> currentContext = workList.last();
 			
 			// If this context has no more nodes to analyze, then take it out of the work-list
 			if (currentContext.getBackwardWorkList().isEmpty()) {
-				backwardWorkList.remove(currentContext);
+				workList.remove(currentContext);
 				continue;
 			}
 
@@ -203,7 +203,7 @@ public abstract class BackwardInterProceduralAnalysis<M,N,A> extends InterProced
 						// Add the calling unit to the calling context's node work-list.
 						callingContext.getBackwardWorkList().add(callNode);
 						// Ensure that the calling context is on the context work-list.
-						backwardWorkList.add(callingContext);
+						workList.add(callingContext);
 					}
 				}
 				
@@ -213,7 +213,7 @@ public abstract class BackwardInterProceduralAnalysis<M,N,A> extends InterProced
 					// If any reachable contexts exist on the work-list, then we cannot free memory
 					boolean canFree = true;
 					for (Context<M,N,A> reachableContext : reachableContexts) {
-						if (backwardWorkList.contains(reachableContext)) {
+						if (workList.contains(reachableContext)) {
 							canFree = false;
 							break;
 						}
@@ -283,7 +283,7 @@ public abstract class BackwardInterProceduralAnalysis<M,N,A> extends InterProced
 		contexts.get(method).add(context);
 		
 		// Add this context to the global work-list
-		backwardWorkList.add(context);
+		workList.add(context);
 		
 		return context;
 
